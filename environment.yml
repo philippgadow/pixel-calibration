@@ -1,0 +1,12 @@
+name: timepix-calibration
+channels:
+  - conda-forge
+dependencies:
+  - python=3.9.1
+  - pip
+  - numpy
+  - matplotlib
+  - pandas
+  - pytables
+  - dask
+
