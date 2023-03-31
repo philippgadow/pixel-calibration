@@ -23,7 +23,7 @@ class Calibration():
         if self.measure_tot: columns = ['ths', 'col', 'row', 'hit', 'tot', 'count']
         if use_dask:
             if self.file.endswith('.csv'):
-                df = dd.read_csv(self.file, comment='#', names=columns, blocksize=5_000).set_index('ths')
+                df = dd.read_csv(self.file, comment='#', names=columns, blocksize=1_000).set_index('ths')
             else:
                 raise RuntimeError("Unknown input file format.")
         else:
@@ -93,16 +93,18 @@ class Measurement():
     def find_single_pixel(self):
         from itertools import product
         for i, j in product(range(self.n_cols), range(self.n_rows)):
-            single_pixel = True
+            # only consider pixels which had a count > 0
+            single_pixel = (self.map[i][j] != 0)
             # scan for neighouring pixels
             for ii, jj in product(range(i-1, i+1), range(j-1, j+1)):
                 if (ii==i and jj==j): continue
                 if (ii < 0 or jj < 0 or ii > self.n_cols or jj > self.n_rows): continue
                 # if neighbour exist, this is not a single pixel
                 if (self.map[ii][jj] != 0): single_pixel = False
+            self.map_single[i][j] = int(single_pixel)
 
     def plot(self):
-        def _plot(data, value, name):
+        def _plot_map(data, value, name):
             plt.style.use(hep.style.ROOT)
             fig, ax = plt.subplots()
             hep.hist2dplot(data, ax=ax)
@@ -112,11 +114,11 @@ class Measurement():
             fig.savefig(join("plots", f"plot_{name}.png"))
             plt.close()
 
-        _plot(self.map, self.value, self.name)
-        _plot(self.map_single, 'single pixel', self.name + '_single_pixel')
+        _plot_map(self.map, self.value, self.name)
+        _plot_map(self.map_single, 'single pixel', self.name + '_single_pixel')
 
 
-test = Calibration('test', 'data/cal.csv')
+test = Calibration('test', 'data/test.csv')
 test.read_csv()
 test.evaluate()
 test.plot()
