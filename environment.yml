@@ -6,7 +6,8 @@ dependencies:
   - pip
   - numpy
   - matplotlib
+  - mplhep
   - pandas
-  - pytables
   - dask
-
+  - hist
+  - tqdm

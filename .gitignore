@@ -2,3 +2,4 @@
 *.png
 *.h5
 plots/
+.DS_Store
