@@ -95,8 +95,6 @@ class Calibration():
         self.hist_count_odd /= np.max(self.hist_count_odd.values())
 
         
-        
-
 class Measurement():
     def __init__(self, name="", threshold=0, n_cols=128, n_rows=128, data=None, value='count'):
         self.name = name
