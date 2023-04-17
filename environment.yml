@@ -1,4 +1,4 @@
-name: timepix-calibration
+name: pixel-calibration
 channels:
   - conda-forge
 dependencies:
@@ -8,6 +8,6 @@ dependencies:
   - matplotlib
   - mplhep
   - pandas
-  - dask
   - hist
   - tqdm
+  
