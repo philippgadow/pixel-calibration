@@ -10,12 +10,13 @@ from os import makedirs
 from pixel_calibration.plotting import plot_hist, plot_map
 
 class Calibration():
-    def __init__(self, name="", file="", n_cols=128, n_rows=128, measure_tot=False):
+    def __init__(self, name="", file="", mask_file="", n_cols=128, n_rows=128, measure_tot=False):
         self.name=name
         self.log = logging.getLogger(name)
         self.log.setLevel(logging.INFO)
 
         self.file = str(file)
+        self.mask_file = mask_file
 
         self.n_cols = n_cols
         self.n_rows = n_rows
@@ -24,6 +25,7 @@ class Calibration():
         # measurements, indiced by threshold
         self.measurements = {}
 
+        # histograms with counts per threshold ("ths")
         self.hist_count = Hist.new.Reg(2299, 0, 2299, name="ths").Double()
         self.hist_count_even = Hist.new.Reg(2299, 0, 2299, name="ths").Double()
         self.hist_count_odd = Hist.new.Reg(2299, 0, 2299, name="ths").Double()
@@ -32,6 +34,21 @@ class Calibration():
         self.output_folder = join("output", self.name)
         makedirs(join(self.output_folder, 'plots'), exist_ok=True)
         makedirs(join(self.output_folder, 'data'), exist_ok=True)
+
+        # read mask file
+        self.mask = None
+        if self.mask_file: self.read_mask_file()
+
+
+    def read_mask_file(self):
+        columns = ['col', 'row']
+        dtype = {
+            'col': np.int32,
+            'row': np.int32,
+        }
+        df = pd.read_csv(self.mask_file, comment='#', names=columns, dtype=dtype)
+        self.mask = pd.MultiIndex.from_frame(df)
+
 
     def read_csv(self):
         columns = ['ths', 'col', 'row', 'hit', 'count']
@@ -65,7 +82,7 @@ class Calibration():
         self.log.info(f'Reading input file {self.file}...')
         for ths in tqdm(thresholds):
             data = df.loc[[ths],["col", "row", "count"]]
-            self.measurements[ths] = Measurement(f"ths_calib_{self.name}", ths, self.n_cols, self.n_rows, data, 'count')
+            self.measurements[ths] = Measurement(f"ths_calib_{self.name}", ths, self.n_cols, self.n_rows, data, 'count', self.mask)
 
 
     def plot(self):
@@ -94,9 +111,12 @@ class Calibration():
         self.hist_count_even /= np.max(self.hist_count_even.values())
         self.hist_count_odd /= np.max(self.hist_count_odd.values())
 
+        # fit histograms
+
+
         
 class Measurement():
-    def __init__(self, name="", threshold=0, n_cols=128, n_rows=128, data=None, value='count'):
+    def __init__(self, name="", threshold=0, n_cols=128, n_rows=128, data=None, value='count', mask=None):
         self.name = name
         self.threshold = threshold
         self.value = value
@@ -106,17 +126,20 @@ class Measurement():
         self.map = np.zeros((self.n_cols, self.n_rows))
         self.map_single = np.zeros((self.n_cols, self.n_rows))
 
-        if data is not None: self.load(data, value)
+        if data is not None: self.load(data, value, mask)
 
 
-    def load(self, data, value='count'):
+    def load(self, data, value='count', mask=None):
         # convert data from measurement to a map of the sensor
         # if there are multiple measurements for a given threshold, sum them up
-        table = data.groupby(['col', 'row'])['count'].sum().to_frame()
+        table = data.groupby(['col', 'row'])[value].sum().to_frame()
         # the measurement data is only recorded if there are counts
         # therefore, padding of empty rows and columns is applied to the map
         new_index = pd.MultiIndex.from_product([range(self.n_cols), range(self.n_rows)], names=('col', 'row'))
         self.map = table.reindex(new_index).fillna(0).astype(np.int32).to_numpy().reshape(self.n_cols,self.n_rows)
+         # if mask map is provided, remove masked pixels (mask: column, row)
+        if mask is not None:
+            for i in mask: self.map[i[0]][i[1]] = 0
 
     def find_single_pixel(self):
         from itertools import product

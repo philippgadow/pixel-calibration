@@ -10,17 +10,23 @@ def parse_args(args):
     )
 
     parser.add_argument(
-        "--reference",
+        "--file",
         required=True,
         type=Path,
-        help="path to reference measurement",
+        help="path to measurement",
     )
 
     parser.add_argument(
-        "--iron",
+        "--name",
         required=True,
-        type=Path,
-        help="path to iron source measurement",
+        type=str,
+        help="name for measurement",
+    )
+
+    parser.add_argument(
+        "--mask",
+        default=None,
+        help="path to mask file to eliminate pixels from calibration",
     )
 
     return parser.parse_args(args)
@@ -29,15 +35,10 @@ def parse_args(args):
 def main(args=None):
     args = parse_args(args)
 
-    calib_ref = Calibration('reference', args.reference)
-    calib_ref.read_csv()
-    calib_ref.evaluate()
-    calib_ref.plot()
-
-    calib_source_fe = Calibration("iron", args.iron)
-    calib_source_fe.read_csv()
-    calib_source_fe.evaluate()
-    calib_source_fe.plot()
+    calib = Calibration(args.name, args.file, args.mask)
+    calib.read_csv()
+    calib.evaluate()
+    calib.plot()
 
 
 if __name__ == "__main__":
