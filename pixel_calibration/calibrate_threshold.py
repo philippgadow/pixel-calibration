@@ -1,6 +1,9 @@
 import argparse
+import pandas as pd
+
 from pathlib import Path
-from pixel_calibration import Calibration
+from hist import Hist
+from pixel_calibration.plotting import plot_hist
 
 
 def parse_args(args):
@@ -10,23 +13,17 @@ def parse_args(args):
     )
 
     parser.add_argument(
-        "--file",
+        "--reference",
         required=True,
         type=Path,
         help="path to measurement",
     )
 
     parser.add_argument(
-        "--name",
+        "--iron",
         required=True,
         type=str,
         help="name for measurement",
-    )
-
-    parser.add_argument(
-        "--mask",
-        default=None,
-        help="path to mask file to eliminate pixels from calibration",
     )
 
     return parser.parse_args(args)
@@ -35,10 +32,23 @@ def parse_args(args):
 def main(args=None):
     args = parse_args(args)
 
-    calib = Calibration(args.name, args.file, args.mask)
-    calib.read_csv()
-    calib.evaluate()
-    calib.plot()
+    df_reference = pd.read_csv(args.reference, index_col='threshold')
+    df_iron = pd.read_csv(args.iron, index_col='threshold')
+    idx = df_reference.index.intersection(df_iron.index)
+
+    print(idx.min(), idx.max())
+
+    df_iron_diff = df_iron.loc[idx] - df_reference.loc[idx]
+
+    # plot histograms
+    h = (
+        Hist.new
+        .Reg(idx.max() - idx.min(), idx.min(), idx.max(), name="ths", label="Threshold [ADC count]")
+        .Int64()
+    )
+    h.fill(idx.to_numpy(), weight=df_iron_diff['counts'].to_numpy())
+    plot_hist(h.project("ths"), '', 'plotty_mcplotface.png')
+
 
 
 if __name__ == "__main__":
