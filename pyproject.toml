@@ -19,6 +19,7 @@ dependencies = [
 "Homepage" = "https://github.com/philippgadow/pixel-calibration/"
 
 [project.scripts]
+analyse = "pixel_calibration.analyse:main"
 calibrate_threshold = "pixel_calibration.calibrate_threshold:main"
 
 [tool.setuptools]
