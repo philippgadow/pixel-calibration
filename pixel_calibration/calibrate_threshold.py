@@ -1,6 +1,6 @@
 import argparse
+import numpy as np
 import pandas as pd
-
 from pathlib import Path
 from hist import Hist
 from pixel_calibration.plotting import plot_hist
@@ -44,11 +44,16 @@ def main(args=None):
     h = (
         Hist.new
         .Reg(idx.max() - idx.min(), idx.min(), idx.max(), name="ths", label="Threshold [ADC count]")
-        .Int64()
+        .Double()
     )
     h.fill(idx.to_numpy(), weight=df_iron_diff['counts'].to_numpy())
     plot_hist(h.project("ths"), '', 'plotty_mcplotface.png')
 
+    idx_max = np.argmax(h.values())
+    ths_max = idx[idx_max]
+    print(f"Maximum threshold for source: {ths_max}")
+
+    
 
 
 if __name__ == "__main__":
