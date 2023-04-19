@@ -3,7 +3,7 @@ import sys
 
 #Code for threshold calibration:
 #This code is used to analyse data from a threshold scan for an Xray exposure onto a CLICpix2 device
-#Reads in a data file from each matrix configuration adn storeds the data
+#Reads in a data file from each matrix configuration and storeds the data
 #Does a simple clustering algorithm to only use single pixel clusters
 #Creates different profiles and histograms wrt ToT and counts
 
@@ -39,6 +39,7 @@ for filename in sys.argv:
     for line in file:
         linenum=linenum+1
         # line structure: threshold,pix col, pix row, hit flag, tot, count
+        # actual line structure: threshold,pix col, pix row, hit flag, count
         l=line.split(",")
         # PG: original line: if l[0].isdigit()==False or len(l)<6:
         if l[0].isdigit()==False or len(l)<5:
@@ -48,6 +49,7 @@ for filename in sys.argv:
             continue
         counts=int(l_2[0])
         ToT=int(l[4])
+        ToT=0
         if counts==0:
             continue
         hitmap.Fill(int(l[1]),int(l[2]),counts)
@@ -144,9 +146,12 @@ for i in range(0,2999):
     difference=h_count.GetBinContent(i) - h_count.GetBinContent(i+1)
     h_diffcount.Fill(i,difference)
 
-h_count.Scale(1/max_entries)
-h_count_even.Scale(1/max_entries_even)
-h_count_odd.Scale(1/max_entries_odd)
+if max_entries > 0:
+    h_count.Scale(1/max_entries)
+if max_entries_even:
+    h_count_even.Scale(1/max_entries_even)
+if max_entries_odd > 0:
+    h_count_odd.Scale(1/max_entries_odd)
 
 outputfile.cd()
 dir = outputfile.mkdir("Directory")
