@@ -7,7 +7,9 @@ from tqdm import tqdm
 from os.path import join
 from os import makedirs
 
-from pixel_calibration.plotting import plot_hist, plot_map
+from pixel_calibration.plotting import plot_hist, plot_map, plot_hotpixel
+from pixel_calibration.utils import cast_df_to_array, find_hottest_pixel
+
 
 class Calibration():
     def __init__(self, name="", file="", mask_file="", n_cols=128, n_rows=128, measure_tot=False):
@@ -23,17 +25,15 @@ class Calibration():
         self.measure_tot = measure_tot
         self.value = "count"
 
+        # pandas dataframe with full measurement
+        self.data_df = None
+
         # measurements, indiced by threshold
         self.measurements = {}
 
-        # 2D histogram to identify hot pixels
+        # 2D histogram of all counts for all measurements
         self.map = np.zeros((self.n_cols, self.n_rows))
-
-        # histograms with counts per threshold ("ths")
-        self.hist_count = Hist.new.Reg(2299, 0, 2299, name="ths").Double()
-        self.hist_count_even = Hist.new.Reg(2299, 0, 2299, name="ths").Double()
-        self.hist_count_odd = Hist.new.Reg(2299, 0, 2299, name="ths").Double()
-
+       
         # output folder
         self.output_folder = join("output", self.name)
         makedirs(join(self.output_folder, 'plots'), exist_ok=True)
@@ -74,57 +74,94 @@ class Calibration():
                 self.value: np.int32,
         }
 
+        self.log.info(f'Loading input file {self.file}...')
         if self.file.endswith('.csv'):
-            df = pd.read_csv(self.file, comment='#', names=columns, dtype=dtype, index_col='ths')
+            self.data_df = pd.read_csv(self.file, comment='#', names=columns, dtype=dtype, index_col='ths')
         elif self.file.endswith('.h5'):
-            df = pd.read_hdf(self.file, columns=columns, index_col='ths')
+            self.data_df = pd.read_hdf(self.file, columns=columns, index_col='ths')
         else:
             raise RuntimeError("Unknown input file format.")
+        self.log.info(f'Loading done!')
+
+
+    def evaluate(self, plot_maps=False):
+        self.log.info(f'Processing measurements...')
+        # convert all measurements into 2D array
+        self.map = cast_df_to_array(self.data_df.loc[:,["col", "row", self.value]], self.value, self.n_cols, self.n_rows)
 
         # sort full dataframe in individual measurements per threshold
-        thresholds = df.index.unique()
-        self.log.info(f'Reading input file {self.file}...')
+        thresholds = self.data_df.index.unique()
         for ths in tqdm(thresholds):
-            data = df.loc[[ths],["col", "row", self.value]]
+            data = self.data_df.loc[[ths],["col", "row", self.value]]
             self.measurements[ths] = Measurement(f"ths_calib_{self.name}", ths, self.n_cols, self.n_rows, data, self.value, self.mask)
 
+        # analyse single pixel
+        self.log.info(f'Starting single pixel count analysis...')
+        hist_count = Hist.new.Reg(2299, 0, 2299, name="ths").Double()
+        hist_count_even = Hist.new.Reg(2299, 0, 2299, name="ths").Double()
+        hist_count_odd = Hist.new.Reg(2299, 0, 2299, name="ths").Double()
 
-    def plot(self, plot_maps=False):
-        plot_hist(self.hist_count.project("ths"), '', join(self.output_folder, 'plots', f'calib_{self.name}.png'))
-        plot_hist(self.hist_count_even.project("ths"), 'even', join(self.output_folder, 'plots', f'calib_{self.name}_even.png'))
-        plot_hist(self.hist_count_odd.project("ths"), 'odd', join(self.output_folder, 'plots', f'calib_{self.name}_odd.png'))
+        with open(join(self.output_folder, 'data', f'single_pixel_counts_{self.name}.csv'), 'w') as outfile:
+            outfile.write("threshold,counts,counts_even,counts_odd\n")
+            for ths, m in tqdm(self.measurements.items()):
+                # find single pixels
+                single_pixel_counts, single_pixel_counts_even, single_pixel_counts_odd = m.find_single_pixel()
+                hist_count.fill([ths for i in single_pixel_counts], weight=single_pixel_counts)
+                hist_count_even.fill([ths for i in single_pixel_counts_even], weight=single_pixel_counts_even)
+                hist_count_odd.fill([ths for i in single_pixel_counts_odd], weight=single_pixel_counts_odd)
+                outfile.write(f"{ths},{np.sum(single_pixel_counts)},{np.sum(single_pixel_counts_even)},{np.sum(single_pixel_counts_odd)}\n")
 
+        # # normalise histograms
+        # hist_count /= np.max(hist_count.values())
+        # hist_count_even /= np.max(hist_count_even.values())
+        # hist_count_odd /= np.max(hist_count_odd.values())
+
+        # fit histograms
+
+        # plot histograms
+        self.log.info(f'Plotting results...')
+        plot_hist(hist_count.project("ths"), '', join(self.output_folder, 'plots', f'calib_{self.name}.png'))
+        plot_hist(hist_count_even.project("ths"), 'even', join(self.output_folder, 'plots', f'calib_{self.name}_even.png'))
+        plot_hist(hist_count_odd.project("ths"), 'odd', join(self.output_folder, 'plots', f'calib_{self.name}_odd.png'))
+
+        # plot 2D map of total counts
         plot_map(self.map, self.value, join(self.output_folder, 'plots', f"total_map_{self.name}.png"))
 
         # plot maps of measurements
         if plot_maps:
-            self.log.info(f'Plotting measurement results...')
             for ths, m in self.measurements.items():
                 m.plot(join(self.output_folder, 'plots'))
 
-    def evaluate(self):
-        self.log.info(f'Evaluating measurements...')
-        with open(join(self.output_folder, 'data', f'single_pixel_counts_{self.name}.csv'), 'w') as outfile:
-            outfile.write("threshold,counts,counts_even,counts_odd\n")
-            for ths, m in tqdm(self.measurements.items()):
-                # sum total pixel count
-                self.map += m.map
-                # find single pixels
-                single_pixel_counts, single_pixel_counts_even, single_pixel_counts_odd = m.find_single_pixel()
-                self.hist_count.fill([ths for i in single_pixel_counts], weight=single_pixel_counts)
-                self.hist_count_even.fill([ths for i in single_pixel_counts_even], weight=single_pixel_counts_even)
-                self.hist_count_odd.fill([ths for i in single_pixel_counts_odd], weight=single_pixel_counts_odd)
-                outfile.write(f"{ths},{np.sum(single_pixel_counts)},{np.sum(single_pixel_counts_even)},{np.sum(single_pixel_counts_odd)}\n")
 
-        # # normalise histograms
-        # self.hist_count /= np.max(self.hist_count.values())
-        # self.hist_count_even /= np.max(self.hist_count_even.values())
-        # self.hist_count_odd /= np.max(self.hist_count_odd.values())
+    def find_hot_pixels(self, hottest_percent=0.01):
+        makedirs(join(self.output_folder, 'hotpixel', 'plots'), exist_ok=True)
+        makedirs(join(self.output_folder, 'hotpixel', 'data'), exist_ok=True)
+        makedirs(join(self.output_folder, 'hotpixel', 'mask'), exist_ok=True)
 
-        # fit histograms
+        thresholds = self.data_df.index.unique()
+        for ths in tqdm(thresholds):
+            data = self.data_df.loc[[ths],["col", "row", self.value]]
+            df_hottest_pixel, cut_value = find_hottest_pixel(data, value=self.value, hottest_percent=hottest_percent)
 
-    def print_hot_pixels(self):
-        print(self.map.max(), np.unravel_index(self.map.argmax(), self.map.shape))
+            max_count = data[self.value].max()
+            hist_hotpixel = Hist.new.Reg(1000, 0, max_count, name="count").Double()
+            hist_hotpixel.fill(data[self.value].values)
+            plot_hotpixel(hist_hotpixel.project("count"), cut_value, join(self.output_folder, 'hotpixel', 'plots', f'hotpixel_{self.name}_{ths}.png'))
+
+            f_hotpixel_count = open(join(self.output_folder, 'hotpixel', 'data', f'hot_pixel_counts_{self.name}_{ths}.csv'), 'w')
+            f_hotpixel_count.write("col,row,counts\n")
+            f_hotpixel_mask = open(join(self.output_folder, 'hotpixel', 'mask', f'hot_pixel_mask_{self.name}_{ths}.csv'), 'w')
+            
+            table_hottest_pixel_total = df_hottest_pixel.groupby(['col', 'row'])[self.value].sum().to_frame().sort_values(by=[self.value], ascending=False)
+            for index, row in table_hottest_pixel_total.iterrows():
+                f_hotpixel_count.write(f"{index[0]},{index[1]},{row.values[0]}\n")
+                f_hotpixel_mask.write(f"{index[0]},{index[1]}\n")
+
+            f_hotpixel_count.close()
+            f_hotpixel_mask.close()
+
+            # only scan the first few 30 thresholds
+            if ths > 1170: break
 
         
 class Measurement():
@@ -135,6 +172,7 @@ class Measurement():
         self.n_cols = n_cols
         self.n_rows = n_rows
 
+        # numpy 2D arrays with n_cols x c_rows entries with value
         self.map = np.zeros((self.n_cols, self.n_rows))
         self.map_single = np.zeros((self.n_cols, self.n_rows))
 
@@ -142,16 +180,12 @@ class Measurement():
 
 
     def load(self, data, value='count', mask=None):
-        # convert data from measurement to a map of the sensor
-        # if there are multiple measurements for a given threshold, sum them up
-        table = data.groupby(['col', 'row'])[value].sum().to_frame()
-        # the measurement data is only recorded if there are counts
-        # therefore, padding of empty rows and columns is applied to the map
-        new_index = pd.MultiIndex.from_product([range(self.n_cols), range(self.n_rows)], names=('col', 'row'))
-        self.map = table.reindex(new_index).fillna(0).astype(np.int32).to_numpy().reshape(self.n_cols,self.n_rows)
+        # copy data to local member variable of dataframe
+        self.map = cast_df_to_array(data, value, self.n_cols, self.n_rows)
          # if mask map is provided, remove masked pixels (mask: column, row)
         if mask is not None:
             for i in mask: self.map[i[0]][i[1]] = 0
+
 
     def find_single_pixel(self):
         from itertools import product
@@ -179,6 +213,7 @@ class Measurement():
                 else: single_pixel_counts_odd.append(self.map[i][j])
 
         return single_pixel_counts, single_pixel_counts_even, single_pixel_counts_odd
+
 
     def plot(self, output_folder):
         plot_map(self.map, self.value, join(output_folder, f"map_{self.name}_{self.threshold}"))

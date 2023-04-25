@@ -25,3 +25,16 @@ def plot_map(data, value, output_path):
     ax.set_ylabel('Rows')
     fig.savefig(output_path)
     plt.close()
+
+
+def plot_hotpixel(data, cut_value, output_path):
+    plt.style.use(hep.style.ROOT)
+    fig, ax = plt.subplots()
+    hep.histplot(data, ax=ax)
+    ax.axvline(cut_value, color='red')
+    ax.set_xlabel('Sum of counts [a.u.]')
+    ax.set_ylabel('Number of pixels')
+    ax.set_yscale("log")
+    fig.tight_layout()
+    fig.savefig(output_path)
+    plt.close()
