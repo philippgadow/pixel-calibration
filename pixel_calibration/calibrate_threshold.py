@@ -36,6 +36,10 @@ def main(args=None):
     df_iron = pd.read_csv(args.iron, index_col='threshold')
     idx = df_reference.index.intersection(df_iron.index)
 
+    # normalise counts
+    df_reference['counts'] = df_reference['counts'] / np.max(df_reference['counts'].to_numpy())
+    df_iron['counts'] = df_iron['counts'] / np.max(df_iron['counts'].to_numpy())
+
     print(idx.min(), idx.max())
 
     df_iron_diff = df_iron.loc[idx] - df_reference.loc[idx]
