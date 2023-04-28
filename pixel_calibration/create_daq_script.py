@@ -22,7 +22,7 @@ def parse_args(args):
     parser.add_argument(
         "--ths_initial",
         type=int,
-        default=1100,
+        default=1200,
         help="",
     )
     parser.add_argument(
@@ -34,7 +34,7 @@ def parse_args(args):
     parser.add_argument(
         "--matrix",
         type=str,
-        default="matrix_longcnt_eq.cfg",
+        default="matrix_totcnt_eq.cfg",
         help="name of matrix file with configuration of individual pixels",
     )
     parser.add_argument(
@@ -72,8 +72,6 @@ def main(args=None):
         calibration_folder=args.calibration_folder,
         loop_str=loop_str,
     )
-
-    print(output)
 
     output_file.write(output)
     output_file.close()
