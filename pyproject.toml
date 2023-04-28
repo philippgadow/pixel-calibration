@@ -21,6 +21,8 @@ dependencies = [
 [project.scripts]
 analyse = "pixel_calibration.analyse:main"
 calibrate_threshold = "pixel_calibration.calibrate_threshold:main"
+create_masked_matrix = "pixel_calibration.create_masked_matrix:main"
+create_daq_script = "pixel_calibration.create_daq_script:main"
 
 [tool.setuptools]
 packages = ["pixel_calibration"]
