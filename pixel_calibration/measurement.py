@@ -52,7 +52,15 @@ class Calibration():
         self.mask = pd.MultiIndex.from_frame(df)
 
 
-    def read_csv(self):
+    def read_csv(self, threshold=None):
+        if threshold is None:
+            self.read_csv_scan_threshold()
+        else:
+            self.read_csv_acquire(threshold)
+
+
+
+    def read_csv_scan_threshold(self):
         columns = ['ths', 'col', 'row', 'hit', self.value]
         dtype = {
             'ths': np.int32,
@@ -70,13 +78,41 @@ class Calibration():
                 'hit': np.int32,
                 'tot': np.int32,
                 self.value: np.int32,
-        }
+            }
 
         self.log.info(f'Loading input file {self.file}...')
         if self.file.endswith('.csv'):
             self.data_df = pd.read_csv(self.file, comment='#', names=columns, dtype=dtype, index_col='ths')
         elif self.file.endswith('.h5'):
             self.data_df = pd.read_hdf(self.file, columns=columns, index_col='ths')
+        else:
+            raise RuntimeError("Unknown input file format.")
+        self.log.info(f'Loading done!')
+
+
+    def read_csv_acquire(self, threshold):
+        columns = ['col', 'row', 'hit', self.value]
+        dtype = {
+                'col': np.int32,
+                'row': np.int32,
+                'hit': np.int32,
+                self.value: np.int32,
+        }
+        if self.measure_tot:
+            columns = ['col', 'row', 'hit', 'tot', self.value]
+            dtype = {
+                    'col': np.int32,
+                    'row': np.int32,
+                    'hit': np.int32,
+                    'tot': np.int32,
+                    self.value: np.int32,
+            }
+        # first six rows are comments by peary, individual acquisitions are indexed with === number === and need to be filtered out
+        self.log.info(f'Loading input file {self.file}...')
+        if self.file.endswith('.csv'):
+            df = pd.read_csv(self.file, comment='=', skiprows=6, names=columns, dtype=dtype)
+            df.insert(0, "ths", threshold)
+            self.data_df = df.set_index('ths')
         else:
             raise RuntimeError("Unknown input file format.")
         self.log.info(f'Loading done!')
