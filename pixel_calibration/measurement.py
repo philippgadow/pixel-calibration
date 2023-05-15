@@ -7,7 +7,7 @@ from tqdm import tqdm
 from os.path import join
 from os import makedirs
 
-from pixel_calibration.plotting import plot_hist, plot_map, plot_hotpixel
+from pixel_calibration.plotting import plot_hist, plot_map, plot_hotpixel, plot_tot_hist
 from pixel_calibration.utils import cast_df_to_array, find_hottest_pixel
 
 
@@ -30,9 +30,6 @@ class Calibration():
 
         # measurements, indiced by threshold
         self.measurements = {}
-
-        # 2D histogram of all counts for all measurements
-        self.map = np.zeros((self.n_cols, self.n_rows))
        
         # output folder
         self.output_folder = join("output", self.name)
@@ -57,7 +54,6 @@ class Calibration():
             self.read_csv_scan_threshold()
         else:
             self.read_csv_acquire(threshold)
-
 
 
     def read_csv_scan_threshold(self):
@@ -122,8 +118,6 @@ class Calibration():
         self.log.info(f'Processing measurements...')
         makedirs(join(self.output_folder, 'plots'), exist_ok=True)
         makedirs(join(self.output_folder, 'data'), exist_ok=True)
-        # convert all measurements into 2D array
-        self.map = cast_df_to_array(self.data_df.loc[:,["col", "row", self.value]], self.value, self.n_cols, self.n_rows)
 
         # sort full dataframe in individual measurements per threshold
         thresholds = self.data_df.index.unique()
@@ -140,7 +134,6 @@ class Calibration():
         hist_count_singlepixel = Hist.new.Reg(2299, 0, 2299, name="ths").Double()
         hist_count_singlepixel_even = Hist.new.Reg(2299, 0, 2299, name="ths").Double()
         hist_count_singlepixel_odd = Hist.new.Reg(2299, 0, 2299, name="ths").Double()
-
 
         with open(join(self.output_folder, 'data', f'total_pixel_counts_{self.name}.csv'), 'w') as outfile_total, \
              open(join(self.output_folder, 'data', f'single_pixel_counts_{self.name}.csv'), 'w') as outfile_single:
@@ -182,13 +175,35 @@ class Calibration():
         plot_hist(hist_count_singlepixel_even.project("ths"), 'even', join(self.output_folder, 'plots', f'calib_singlepixel_{self.name}_even.png'))
         plot_hist(hist_count_singlepixel_odd.project("ths"), 'odd', join(self.output_folder, 'plots', f'calib_singlepixel_{self.name}_odd.png'))
 
-        # plot 2D map of total counts
-        plot_map(self.map, self.value, join(self.output_folder, 'plots', f"total_map_{self.name}.png"))
-
         # plot maps of measurements
         if plot_maps:
             for ths, m in self.measurements.items():
                 m.plot(join(self.output_folder, 'plots'))
+
+
+        # plot time over threshold histograms
+        if self.measure_tot:
+            for ths in tqdm(thresholds):
+                hist_tot_totalpixel = Hist.new.Reg(2299, 0, 2299, name="tot").Double()
+                hist_tot_totalpixel_even = Hist.new.Reg(2299, 0, 2299, name="tot").Double()
+                hist_tot_totalpixel_odd = Hist.new.Reg(2299, 0, 2299, name="tot").Double()
+
+                tot_data = cast_df_to_array(self.data_df.loc[[ths],["col", "row", "tot"]], "tot", self.n_cols, self.n_rows)
+                select_even = np.zeros((self.n_cols, self.n_rows), dtype=int)
+                select_even[0::2,:] = 1
+                tot_data_even = tot_data[select_even]
+
+                select_odd = np.zeros((self.n_cols, self.n_rows), dtype=int)
+                select_odd[1::2,:] = 1
+                tot_data_odd = tot_data[select_odd]
+                
+                hist_tot_totalpixel.fill(tot_data.flatten())
+                # hist_tot_totalpixel_even.fill(tot_data_even)
+                # hist_tot_totalpixel_odd.fill(tot_data_odd)
+
+                plot_tot_hist(hist_tot_totalpixel.project("tot"), '', join(self.output_folder, 'plots', f'tot_totalpixel_{self.name}.png'))
+                # plot_tot_hist(hist_tot_totalpixel_even.project("tot"), 'even', join(self.output_folder, 'plots', f'tot_totalpixel_{self.name}_even.png'))
+                # plot_tot_hist(hist_tot_totalpixel_odd.project("tot"), 'odd', join(self.output_folder, 'plots', f'tot_totalpixel_{self.name}_odd.png'))
 
 
     def find_hot_pixels(self, hottest_percent=0.01):
@@ -219,8 +234,6 @@ class Calibration():
             f_hotpixel_count.close()
             f_hotpixel_mask.close()
 
-            # only scan the first few 30 thresholds
-            if ths > 1170: break
 
         
 class Measurement():
