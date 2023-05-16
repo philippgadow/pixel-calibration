@@ -1,9 +1,9 @@
-from ROOT import TFile, TH1F, TH2F
+from ROOT import TFile, TH1F, gPad, TMath, TF1, TGraph, TH2F, TProfile
 import sys
 
 #Code for threshold calibration:
 #This code is used to analyse data from a threshold scan for an Xray exposure onto a CLICpix2 device
-#Reads in a data file from each matrix configuration and storeds the data
+#Reads in a data file from each matrix configuration adn storeds the data
 #Does a simple clustering algorithm to only use single pixel clusters
 #Creates different profiles and histograms wrt ToT and counts
 
@@ -16,7 +16,7 @@ h_count_odd=TH1F("h_count_odd", "h_count_odd", 2299, 0,2299)
 h_diffcount=TH1F("h_diffcount", "h_diffcount", 2299, 0,2299)
 h_ToT=TH1F("h_ToT", "h_ToT", 30, 0,30)
 
-thl=1284
+thl=1200
 hitmap=TH2F("hitmap","hitmap;x;y",128,0,128,128,0,128)
 end_thl=[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
 
@@ -39,29 +39,26 @@ for filename in sys.argv:
     for line in file:
         linenum=linenum+1
         # line structure: threshold,pix col, pix row, hit flag, tot, count
-        # actual line structure: threshold,pix col, pix row, hit flag, count
         l=line.split(",")
-        # PG: original line: if l[0].isdigit()==False or len(l)<6:
-        if l[0].isdigit()==False or len(l)<5:
+        if l[0].isdigit()==False or len(l)<6:
             continue
         l_2=l[-1].split("\n")
         if l_2[0].isdigit()!=True:
             continue
         counts=int(l_2[0])
         ToT=int(l[4])
-        ToT=0
         if counts==0:
             continue
         hitmap.Fill(int(l[1]),int(l[2]),counts)
         THLdac=int(l[0])
         if THLdac<end_thl[filenum]:
-            print("breaking file" + filename + "at threshold" + THLdac)
+            print("breaking file" + filename + "at threshold" +THLdac)
             break
 
         if first_frame==True:
             previousthl=THLdac
             first_frame=False
-        elif(THLdac<previousthl):
+        elif(THLdac>previousthl):
             # new thl, calculating single pixel clusters and resetting the hit map
             ##loop to add info to histos
             for i in range(0,numpix):
@@ -146,12 +143,9 @@ for i in range(0,2999):
     difference=h_count.GetBinContent(i) - h_count.GetBinContent(i+1)
     h_diffcount.Fill(i,difference)
 
-if max_entries > 0:
-    h_count.Scale(1/max_entries)
-if max_entries_even:
-    h_count_even.Scale(1/max_entries_even)
-if max_entries_odd > 0:
-    h_count_odd.Scale(1/max_entries_odd)
+h_count.Scale(1/max_entries)
+h_count_even.Scale(1/max_entries_even)
+h_count_odd.Scale(1/max_entries_odd)
 
 outputfile.cd()
 dir = outputfile.mkdir("Directory")

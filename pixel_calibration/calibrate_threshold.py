@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 from hist import Hist
-from pixel_calibration.plotting import plot_hist
+from pixel_calibration.plotting import plot_count_hist
 
 
 def parse_args(args):

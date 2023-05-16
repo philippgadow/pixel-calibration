@@ -4,14 +4,18 @@ import matplotlib.colors as colors
 import numpy as np
 
 # plot histograms
-def plot_hist(data, title, output_path):
+def plot_count_hist(data, title, output_path, single_pixel=False):
     plt.style.use(hep.style.ROOT)
     fig, ax = plt.subplots()
     hep.histplot(data, ax=ax)
     ax.set_title(title)
     ax.set_xlabel('Threshold [a.u.]')
-    ax.set_ylabel('Normalised single pixel counts [a.u.]')
+    if single_pixel:
+        ax.set_ylabel('Normalised single pixel counts [a.u.]')
+    else:
+        ax.set_ylabel('Normalised counts [a.u.]')
     ax.set_xlim([1100, 1400])
+    ax.set_yscale("log")
     fig.tight_layout()
     fig.savefig(output_path)
     plt.close()
@@ -46,7 +50,8 @@ def plot_tot_hist(data, title, output_path):
     fig, ax = plt.subplots()
     hep.histplot(data, ax=ax)
     ax.set_title(title)
-    ax.set_xlim([0, 14])
+    ax.set_xlim([1, 14])
+    ax.set_ylim([0.1, 1e4])
     ax.set_xlabel('Time over threshold')
     ax.set_ylabel('Entries')
     ax.set_yscale("log")
