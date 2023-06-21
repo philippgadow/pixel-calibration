@@ -22,10 +22,34 @@ python -m pip install -e .
 Assuming you have acquired data with peary, you can use the csv files to run the calibration code:
 
 ```bash
-calibrate_threshold --file data/cal.csv --name reference --mask data/mask.csv
-calibrate_threshold --file data/iron.csv --name iron --mask data/mask.csv
+usage: analyse [-h] --file FILE --name NAME [--mask MASK] [--threshold THRESHOLD] [--tot] [--find_hot_pixels FIND_HOT_PIXELS]
+
+Run calibration
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --file FILE           path to measurement (default: None)
+  --name NAME           name for measurement (default: None)
+  --mask MASK           path to mask file to eliminate pixels from calibration (default: None)
+  --threshold THRESHOLD
+                        Threshold of measurement, use only if processing data taking with acquire mode as opposed to threshold scan (default: None)
+  --tot                 Analyse time over threshold measurement (default: False)
+  --find_hot_pixels FIND_HOT_PIXELS
+                        if set, determine hot pixels (with specified percent of highest counts) (default: None)
 ```
 
 Note that you can provide a mask file, which contains in csv format the column and row of pixels which should be masked for the calibration.
 
 As a result, you find the outputs from the calibration in the `output` directory.
+
+```bash
+usage: calibrate_threshold [-h] --reference REFERENCE --iron IRON
+
+Run calibration
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --reference REFERENCE
+                        path to measurement (default: None)
+  --iron IRON           name for measurement (default: None)
+```

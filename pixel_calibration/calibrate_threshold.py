@@ -51,7 +51,7 @@ def main(args=None):
         .Double()
     )
     h.fill(idx.to_numpy(), weight=df_iron_diff['counts'].to_numpy())
-    plot_hist(h.project("ths"), '', 'plotty_mcplotface.png')
+    plot_count_hist(h.project("ths"), '', 'plotty_mcplotface.png')
 
     idx_max = np.argmax(h.values())
     ths_max = idx[idx_max]

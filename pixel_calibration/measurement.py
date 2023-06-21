@@ -62,7 +62,7 @@ class Calibration():
             'col': np.int32,
             'row': np.int32,
             'hit': np.int32,
-            'count': np.int32,
+            'count': np.int64,
         }
         if self.measure_tot:
             columns = ['ths', 'col', 'row', 'hit', 'tot', 'count']
@@ -72,14 +72,12 @@ class Calibration():
                 'row': np.int32,
                 'hit': np.int32,
                 'tot': np.int32,
-                'count': np.int32,
+                'count': np.int64,
             }
 
         self.log.info(f'Loading input file {self.file}...')
         if self.file.endswith('.csv'):
             self.data_df = pd.read_csv(self.file, comment='#', names=columns, dtype=dtype, index_col='ths')
-        elif self.file.endswith('.h5'):
-            self.data_df = pd.read_hdf(self.file, columns=columns, index_col='ths')
         else:
             raise RuntimeError("Unknown input file format.")
         self.log.info(f'Loading done!')
@@ -91,7 +89,7 @@ class Calibration():
                 'col': np.int32,
                 'row': np.int32,
                 'hit': np.int32,
-                'count': np.int32,
+                'count': np.int64,
         }
         if self.measure_tot:
             columns = ['col', 'row', 'hit', 'tot', 'count']
@@ -100,12 +98,12 @@ class Calibration():
                     'row': np.int32,
                     'hit': np.int32,
                     'tot': np.int32,
-                    'count': np.int32,
+                    'count': np.int64,
             }
-        # first six rows are comments by peary, individual acquisitions are indexed with === number === and need to be filtered out
+        # first seven rows are comments by peary, individual acquisitions are indexed with === number === and need to be filtered out
         self.log.info(f'Loading input file {self.file}...')
         if self.file.endswith('.csv'):
-            df = pd.read_csv(self.file, comment='=', skiprows=6, names=columns, dtype=dtype)
+            df = pd.read_csv(self.file, comment='=', skiprows=7, names=columns, dtype=dtype)
             df.insert(0, "ths", threshold)
             self.data_df = df.set_index('ths')
         else:
@@ -187,27 +185,28 @@ class Calibration():
                 plot_tot_hist(hist_tot_totalpixel.project("tot"), '', join(self.output_folder, 'plots', f'tot_totalpixel_{self.name}_{ths}.png'))
 
 
-    def find_hot_pixels(self, value='count', hottest_percent=0.01):
+    def find_hot_pixels(self, hottest_percent=0.01):
         makedirs(join(self.output_folder, 'hotpixel', 'plots'), exist_ok=True)
         makedirs(join(self.output_folder, 'hotpixel', 'data'), exist_ok=True)
         makedirs(join(self.output_folder, 'hotpixel', 'mask'), exist_ok=True)
 
         thresholds = self.data_df.index.unique()
         for ths in tqdm(thresholds):
-            data = self.data_df.loc[[ths],["col", "row", value]]
-            data = data.groupby(['col', 'row'])[value].sum().to_frame()
-            df_hottest_pixel, cut_value = find_hottest_pixel(data, value=value, hottest_percent=hottest_percent)
+            data = self.data_df.loc[[ths],["col", "row", "count"]]
+            print(data)
+            data = data.groupby(['col', 'row'])["count"].sum().to_frame()
+            df_hottest_pixel, cut_value = find_hottest_pixel(data, value="count", hottest_percent=hottest_percent)
 
-            max_count = data[value].max()
+            max_count = data["count"].max()
             hist_hotpixel = Hist.new.Reg(100, 0, max_count, name="count").Double()
-            hist_hotpixel.fill(data[value].values)
+            hist_hotpixel.fill(data["count"].values)
             plot_hotpixel(hist_hotpixel.project("count"), cut_value, join(self.output_folder, 'hotpixel', 'plots', f'hotpixel_{self.name}_{ths}.png'))
 
             f_hotpixel_count = open(join(self.output_folder, 'hotpixel', 'data', f'hot_pixel_counts_{self.name}_{ths}.csv'), 'w')
             f_hotpixel_count.write("col,row,counts\n")
             f_hotpixel_mask = open(join(self.output_folder, 'hotpixel', 'mask', f'hot_pixel_mask_{self.name}_{ths}.csv'), 'w')
             
-            table_hottest_pixel_total = df_hottest_pixel.sort_values(by=[value], ascending=False)
+            table_hottest_pixel_total = df_hottest_pixel.sort_values(by=["count"], ascending=False)
             for index, row in table_hottest_pixel_total.iterrows():
                 f_hotpixel_count.write(f"{index[0]},{index[1]},{row.values[0]}\n")
                 f_hotpixel_mask.write(f"{index[0]},{index[1]}\n")
