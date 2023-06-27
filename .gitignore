@@ -4,4 +4,5 @@
 output/
 .DS_Store
 __pycache__/
+.ipynb_checkpoints/
 pixel_calibration.egg-info/
