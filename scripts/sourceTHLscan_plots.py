@@ -1,5 +1,6 @@
 from ROOT import TFile, TH1F, gPad, TMath, TF1, TGraph, TH2F, TProfile
 import sys
+import os
 
 #Code for threshold calibration:
 #This code is used to analyse data from a threshold scan for an Xray exposure onto a CLICpix2 device
@@ -7,7 +8,10 @@ import sys
 #Does a simple clustering algorithm to only use single pixel clusters
 #Creates different profiles and histograms wrt ToT and counts
 
-outputfile = TFile("sourceTHLscan_plots.root", "recreate")
+
+
+filename = os.path.basename(sys.argv[1]).replace('.csv', '')
+outputfile = TFile("sourceTHLscan_plots_" + filename + ".root", "recreate")
 
 h_count=TH1F("h_count", "h_count", 2299, 0,2299)
 h_count_even=TH1F("h_count_even", "h_count_even", 2299, 0,2299)
@@ -147,13 +151,5 @@ h_count.Scale(1/max_entries)
 h_count_even.Scale(1/max_entries_even)
 h_count_odd.Scale(1/max_entries_odd)
 
-outputfile.cd()
-dir = outputfile.mkdir("Directory")
-dir.cd()
-dir.WriteObject(hitmap,"Hitmap", "hist")
-dir.WriteObject(h_count,"Hist: Counts vs. THLdac", "hist")
-dir.WriteObject(h_count_even,"Hist: Counts vs. THLdac (even)", "hist")
-dir.WriteObject(h_count_odd,"Hist: Counts vs. THLdac (odd)", "hist")
-dir.WriteObject(h_ToT,"Hist: ToT for particular THL", "hist")
-dir.WriteObject(h_diffcount,"Hist: difference in Counts vs. THLdac", "hist")
+outputfile.Write()
 outputfile.Close()
